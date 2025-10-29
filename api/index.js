@@ -17,7 +17,6 @@ export default async function handler(req) {
       return new Response('Missing GOOGLE_SERVER_KEY', { status: 500 });
     }
 
-    // Build Google Photos API URL
     const googleUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${encodeURIComponent(
       w
     )}&photo_reference=${encodeURIComponent(ref)}&key=${encodeURIComponent(key)}`;
@@ -27,16 +26,17 @@ export default async function handler(req) {
       return new Response(`Google API error ${resp.status}`, { status: 502 });
     }
 
-    // Stream body back; set CORS + cache (24h)
-    const headers = new Headers(resp.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Cache-Control', 'public, max-age=86400');
-
+    // Streama tillbaka datan direkt med CORS + cache (24h)
     return new Response(resp.body, {
       status: 200,
-      headers,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=86400',
+        'Content-Type': resp.headers.get('content-type') || 'image/jpeg',
+      },
     });
   } catch (err) {
+    console.error('Proxy error', err);
     return new Response('Proxy error', { status: 500 });
   }
 }
