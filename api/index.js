@@ -1,27 +1,42 @@
-import fetch from "node-fetch";
+export const config = {
+  runtime: 'edge',
+};
 
-export default async function handler(req, res) {
-  const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
-  const ref = searchParams.get("ref");
-  const w = searchParams.get("w") || "800";
+export default async function handler(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const ref = searchParams.get('ref');
+    const w = searchParams.get('w') || '800';
 
-  if (!ref) {
-    return res.status(400).json({ error: "Missing photo reference (?ref=...)" });
+    if (!ref) {
+      return new Response('Missing ref', { status: 400 });
+    }
+
+    const key = process.env.GOOGLE_SERVER_KEY;
+    if (!key) {
+      return new Response('Missing GOOGLE_SERVER_KEY', { status: 500 });
+    }
+
+    // Build Google Photos API URL
+    const googleUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${encodeURIComponent(
+      w
+    )}&photo_reference=${encodeURIComponent(ref)}&key=${encodeURIComponent(key)}`;
+
+    const resp = await fetch(googleUrl, { redirect: 'follow' });
+    if (!resp.ok) {
+      return new Response(`Google API error ${resp.status}`, { status: 502 });
+    }
+
+    // Stream body back; set CORS + cache (24h)
+    const headers = new Headers(resp.headers);
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Cache-Control', 'public, max-age=86400');
+
+    return new Response(resp.body, {
+      status: 200,
+      headers,
+    });
+  } catch (err) {
+    return new Response('Proxy error', { status: 500 });
   }
-
-  const GOOGLE_SERVER_KEY = process.env.GOOGLE_SERVER_KEY;
-  if (!GOOGLE_SERVER_KEY) {
-    return res.status(500).json({ error: "Missing Google Server Key in environment" });
-  }
-
-  const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${w}&photo_reference=${ref}&key=${GOOGLE_SERVER_KEY}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    return res.status(response.status).json({ error: "Failed to fetch image" });
-  }
-
-  res.setHeader("Cache-Control", "public, max-age=86400"); // cache 24h
-  res.setHeader("Content-Type", response.headers.get("content-type"));
-  response.body.pipe(res);
 }
