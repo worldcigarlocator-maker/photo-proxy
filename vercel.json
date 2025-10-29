@@ -1,9 +1,11 @@
 {
   "version": 2,
   "functions": {
-    "api/photo-proxy.js": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 10
+    "api/index.js": {
+      "runtime": "nodejs18.x"
     }
-  }
+  },
+  "routes": [
+    { "src": "/(.*)", "dest": "api/index.js" }
+  ]
 }
